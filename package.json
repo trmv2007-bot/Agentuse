@@ -1,0 +1,13 @@
+{
+  "name": "mcserver-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Password-protected Minecraft server dashboard for a self-hosted machine",
+  "scripts": {
+    "start": "node dashboard/server.js",
+    "dev": "node --watch dashboard/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

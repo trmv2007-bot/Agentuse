@@ -1,0 +1,13 @@
+# Local Minecraft runtime data
+server/
+world/
+world_nether/
+world_the_end/
+logs/
+crash-reports/
+backups/
+eula.txt
+*.jar
+
+# Keep intentional plugin JARs out of the repository unless explicitly force-added
+plugins/*.jar
