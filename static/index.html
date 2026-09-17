@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGENTUSE — SpaceGrid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,4 92,28 92,72 50,96 8,72 8,28' fill='none' stroke='%2322d3ee' stroke-width='8'/><text x='50' y='62' font-size='38' text-anchor='middle' fill='%2322d3ee' font-family='monospace'>AU</text></svg>">
+</head>
+<body class="mode-jarvis">
+
+<canvas id="bg"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+
+<!-- ══════════ BOOT SEQUENCE ══════════ -->
+<div id="boot">
+  <div id="boot-inner">
+    <pre id="boot-logo">    ╔═══════════════════════════════════════╗
+    ║   A G E N T U S E                     ║
+    ║   AUTONOMOUS GRID INTELLIGENCE v1.0   ║
+    ╚═══════════════════════════════════════╝</pre>
+    <div id="boot-lines"></div>
+    <div id="boot-status">▌</div>
+  </div>
+</div>
+
+<!-- ══════════ TOP BAR ══════════ -->
+<header id="topbar">
+  <div class="brand">
+    <div class="logo-hex"><span>AU</span></div>
+    <div class="brand-text">
+      <div class="brand-name">AGENTUSE</div>
+      <div class="brand-sub">AUTONOMOUS GRID INTELLIGENCE</div>
+    </div>
+  </div>
+
+  <div class="mode-switch" title="Agent operating mode">
+    <div class="btns">
+      <button id="mode-jarvis" class="active">JARVIS</button>
+      <button id="mode-ultron">ULTRON</button>
+    </div>
+    <div class="mode-hint" id="mode-hint">careful · sequential</div>
+  </div>
+
+  <div class="chips">
+    <div class="chip" id="chip-core" title="Reasoning core">◈ CORE · <b>—</b></div>
+    <div class="chip" id="chip-net" title="Live network routes">⌁ NET · <b>—</b></div>
+    <div class="chip" id="chip-ws" title="Telemetry link">◉ LINK · <b>—</b></div>
+    <div class="chip" id="chip-events" title="Events streamed">Σ <b>0</b></div>
+    <button class="chip toggle" id="chip-voice" title="Speak mission reports">VOICE · OFF</button>
+  </div>
+</header>
+
+<!-- ══════════ MAIN GRID ══════════ -->
+<main id="layout">
+
+  <!-- LEFT -->
+  <section class="col left">
+    <div class="panel" id="panel-missions">
+      <div class="panel-title">MISSIONS</div>
+      <div class="panel-body" id="missions-list"></div>
+    </div>
+    <div class="panel" id="panel-tools">
+      <div class="panel-title">CAPABILITIES</div>
+      <div class="panel-body" id="tools-list"></div>
+    </div>
+  </section>
+
+  <!-- CENTER -->
+  <section class="col center">
+    <div class="panel" id="panel-stream">
+      <div class="panel-title">THOUGHT STREAM <span class="title-live">● LIVE</span></div>
+      <div class="panel-body" id="stream"></div>
+    </div>
+    <div class="panel" id="panel-intel">
+      <div class="panel-title">INTEL GRID</div>
+      <div class="panel-body" id="intel"></div>
+    </div>
+  </section>
+
+  <!-- RIGHT -->
+  <section class="col right">
+    <div class="panel" id="panel-net">
+      <div class="panel-title">NETWORK MAP
+        <button class="mini-btn" id="reprobe" title="Re-probe all routes">↻ PROBE</button>
+      </div>
+      <div class="panel-body" id="netmap"></div>
+    </div>
+    <div class="panel" id="panel-vitals">
+      <div class="panel-title">VITALS</div>
+      <div class="panel-body">
+        <div id="vitals-grid"></div>
+        <canvas id="spark" height="46"></canvas>
+      </div>
+    </div>
+    <div class="panel grow" id="panel-log">
+      <div class="panel-title">SYSTEM LOG</div>
+      <div class="panel-body" id="syslog"></div>
+    </div>
+    <div class="panel" id="panel-artifacts">
+      <div class="panel-title">ARTIFACTS</div>
+      <div class="panel-body" id="artifacts"></div>
+    </div>
+  </section>
+</main>
+
+<!-- ══════════ COMMAND BAR ══════════ -->
+<footer id="commandbar">
+  <button id="mic" title="Voice directive">🎙</button>
+  <div class="cmd-wrap">
+    <span class="cmd-prompt" id="cmd-prompt">J.A.R.V.I.S ▸</span>
+    <input id="cmd" autocomplete="off" spellcheck="false"
+           placeholder="Issue a directive…  e.g. “compare top python agent frameworks on github”">
+  </div>
+  <button id="exec">EXECUTE<span class="exec-key">⏎</span></button>
+</footer>
+
+<!-- ══════════ MODAL ══════════ -->
+<div id="modal" class="hidden">
+  <div id="modal-box">
+    <div id="modal-head"><span id="modal-title"></span><button id="modal-close">✕</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="/grid.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
