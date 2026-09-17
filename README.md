@@ -29,7 +29,8 @@ or fully remote:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/trmv2007-bot/Agentuse/main/install.sh)"
 ```
 
-**Windows** — double-click `install.bat`, or in PowerShell:
+**Windows** — double-click `install.bat`, or in PowerShell
+(needs Python 3.10+; see [Windows: `Python was not found`](#windows-python-was-not-found)):
 ```powershell
 git clone https://github.com/trmv2007-bot/Agentuse.git; cd Agentuse; .\install.ps1
 # or fully remote:
@@ -64,6 +65,34 @@ Then try:
 | paste a fenced code block | Executes it in the sandbox, streams stdout/stderr |
 | `https://some-site.com summarize` | Fetches, extracts readable text, digests key bullets |
 | `what happened in ai this week` | Multi-provider search → deep-read → synthesized report |
+
+## Windows: `Python was not found`
+
+If the PowerShell installer dies with this, **Python is not actually installed** —
+or Windows is hiding it behind its Microsoft Store shortcut:
+
+```
+python.exe : Python was not found; run without arguments to install from the
+Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app
+settings > App execution aliases.
+```
+
+Windows 10/11 ship a 0-byte *App Execution Alias* at
+`%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe`. It answers `where python`,
+then prints that message and exits — so any installer that only checks
+*"is python on PATH?"* gets fooled. Fix it:
+
+1. Install Python 3.10+ from <https://www.python.org/downloads/> and **tick
+   "Add python.exe to PATH"** — or `winget install -e --id Python.Python.3.12`.
+2. Turn the stub off: **Settings → Apps → Advanced app settings → App execution
+   aliases** → switch **python.exe** and **python3.exe** to *Off*.
+3. Open a **new** terminal (PATH changes don't reach already-open shells) and
+   rerun `install.ps1` / `install.bat`.
+
+Already installed? `py -3 --version` is the reliable check — the `py` launcher
+ignores the Store stub, and both installers prefer it. `install.ps1` also skips
+the stub automatically, falls back to `py -3` and to the usual install folders,
+and prints what it tried when nothing works.
 
 ## JARVIS vs ULTRON mode
 
