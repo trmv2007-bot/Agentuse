@@ -35,8 +35,18 @@ if not defined PY (
     )
 )
 if not defined PY (
-    echo [!] Python 3.10+ not found. Install from https://www.python.org/downloads/
-    echo     IMPORTANT: tick "Add python.exe to PATH" in the installer.
+    echo.
+    echo [!] Python 3.10+ not found.
+    where python 2>nul | find /i "WindowsApps" >nul 2>nul && (
+        echo     `python` on your PATH is the Microsoft Store stub, not a real interpreter.
+    )
+    echo     Install from https://www.python.org/downloads/ and TICK
+    echo     "Add python.exe to PATH"  -  or run:  winget install -e --id Python.Python.3.12
+    echo.
+    echo     Already installed but still failing? Windows' Store shortcut is
+    echo     shadowing it -  Settings ^> Apps ^> Advanced app settings ^>
+    echo     App execution aliases  -  switch OFF python.exe and python3.exe,
+    echo     then open a NEW terminal and run this installer again.
     pause & exit /b 1
 )
 for /f "tokens=*" %%v in ('%PY% --version 2^>^&1') do echo [OK] python: %%v
