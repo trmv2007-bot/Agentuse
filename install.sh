@@ -65,11 +65,12 @@ fi
 ok "dependencies installed"
 
 # ---- 4. boot ----
+PORT="${AGENTUSE_PORT:-8000}"
 echo
 printf "${CYAN}  ╔══════════════════════════════════════════════╗${OFF}\n"
 printf "${CYAN}  ║   A G E N T U S E  —  GRID COMING ONLINE     ║${OFF}\n"
-printf "${CYAN}  ║   SpaceGrid →  http://localhost:8000         ║${OFF}\n"
+printf "${CYAN}  ║   SpaceGrid →  http://localhost:${PORT}%-11s║${OFF}\n" ""
 printf "${CYAN}  ║   Ctrl+C to take the grid offline            ║${OFF}\n"
 printf "${CYAN}  ╚══════════════════════════════════════════════╝${OFF}\n"
 echo
-PORT="${AGENTUSE_PORT:-8000}" exec "$VPY" run.py
+exec "$VPY" run.py
