@@ -18,7 +18,29 @@ produces streams to your screen the instant it happens. Nothing is hidden.
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-## Quickstart
+## Quickstart — one shot
+
+**Linux / macOS**
+```bash
+git clone https://github.com/trmv2007-bot/Agentuse.git && cd Agentuse && bash install.sh
+```
+or fully remote:
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/trmv2007-bot/Agentuse/main/install.sh)"
+```
+
+**Windows** — double-click `install.bat`, or in PowerShell:
+```powershell
+git clone https://github.com/trmv2007-bot/Agentuse.git; cd Agentuse; .\install.ps1
+# or fully remote:
+irm https://raw.githubusercontent.com/trmv2007-bot/Agentuse/main/install.ps1 | iex
+```
+
+The installer finds Python 3.10+, builds an isolated `.venv`, installs
+`fastapi / uvicorn / httpx / beautifulsoup4 / lxml`, and boots the SpaceGrid on
+**http://localhost:8000** (Ctrl+C or close the window to stop it).
+
+Manual equivalent:
 
 ```bash
 pip install -r requirements.txt
