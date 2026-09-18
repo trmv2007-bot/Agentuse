@@ -12,12 +12,12 @@ from agentuse.server import app
 if __name__ == "__main__":
     print(f"""
     ╔══════════════════════════════════════════════╗
-    ║   A G E N T U S E  —  Autonomous Grid        ║
-    ║   Intelligence · JARVIS/ULTRON class         ║
+    ║   A G E N T U S E  v{config.VERSION:<6} — Grid Intel     ║
+    ║   JARVIS/ULTRON · heuristic ⇄ neural         ║
     ║                                              ║
     ║   SpaceGrid  →  http://localhost:{config.PORT:<6}      ║
-    ║   Core       →  heuristic (add API key to    ║
-    ║                 upgrade to neural ReAct)     ║
+    ║   Core       →  heuristic (XAI_API_KEY to    ║
+    ║                 upgrade to streaming ReAct)  ║
     ╚══════════════════════════════════════════════╝
 """)
     uvicorn.run(app, host=config.HOST, port=config.PORT, log_level="warning")

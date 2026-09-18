@@ -1,4 +1,4 @@
-"""SQLite-backed persistent memory: missions + events + episodic notes."""
+"""SQLite-backed persistent memory: missions + events + FTS5 notes."""
 import json
 import sqlite3
 import threading
@@ -9,10 +9,11 @@ from . import config
 
 _lock = threading.Lock()
 _conn: Optional[sqlite3.Connection] = None
+_fts = False
 
 
 def _get() -> sqlite3.Connection:
-    global _conn
+    global _conn, _fts
     if _conn is None:
         _conn = sqlite3.connect(str(config.DB_PATH), check_same_thread=False)
         _conn.row_factory = sqlite3.Row
@@ -38,11 +39,22 @@ def _get() -> sqlite3.Connection:
             );
             """
         )
+        try:
+            _conn.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts "
+                "USING fts5(content, kind, mission, content='notes', content_rowid='id')"
+            )
+            _conn.execute(
+                "CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN "
+                "INSERT INTO notes_fts(rowid, content, kind, mission) "
+                "VALUES (new.id, new.content, new.kind, new.mission); END;"
+            )
+            _fts = True
+        except sqlite3.OperationalError:
+            _fts = False
         _conn.commit()
     return _conn
 
-
-# ---------- missions ----------
 
 def create_mission(mid: str, goal: str, mode: str, core: str) -> None:
     with _lock:
@@ -62,8 +74,9 @@ def finish_mission(mid: str, status: str, summary: str = "", steps_done: int = 0
 
 def cancel_mission(mid: str) -> bool:
     with _lock:
-        c = _get().execute("UPDATE missions SET status='cancel-requested' WHERE id=? AND status='running'",
-                           (mid,))
+        c = _get().execute(
+            "UPDATE missions SET status='cancel-requested' WHERE id=? AND status='running'",
+            (mid,))
         _get().commit()
     return c.rowcount > 0
 
@@ -80,8 +93,6 @@ def list_missions(limit: int = 60) -> List[dict]:
             "SELECT * FROM missions ORDER BY created DESC LIMIT ?", (limit,)).fetchall()
     return [dict(r) for r in rows]
 
-
-# ---------- events ----------
 
 def save_event(ev: dict) -> None:
     with _lock:
@@ -110,8 +121,6 @@ def load_events(after: int = 0, limit: int = 5000, newest: bool = False) -> List
     return out
 
 
-# ---------- episodic notes ----------
-
 def remember(kind: str, content: str, mission: Optional[str] = None) -> None:
     with _lock:
         _get().execute("INSERT INTO notes(ts, mission, kind, content) VALUES(?,?,?,?)",
@@ -121,17 +130,27 @@ def remember(kind: str, content: str, mission: Optional[str] = None) -> None:
 
 def recall(query: str = "", limit: int = 12) -> List[dict]:
     with _lock:
+        c = _get()
+        if query and _fts:
+            try:
+                rows = c.execute(
+                    "SELECT n.* FROM notes n JOIN notes_fts f ON n.id = f.rowid "
+                    "WHERE notes_fts MATCH ? ORDER BY n.id DESC LIMIT ?",
+                    (query, limit)).fetchall()
+                if rows:
+                    return [dict(r) for r in rows]
+            except sqlite3.OperationalError:
+                pass
         if query:
-            rows = _get().execute(
-                "SELECT * FROM notes WHERE content LIKE ? ORDER BY id DESC LIMIT ?",
-                (f"%{query}%", limit)).fetchall()
+            rows = c.execute(
+                "SELECT * FROM notes WHERE content LIKE ? OR kind LIKE ? "
+                "ORDER BY id DESC LIMIT ?",
+                (f"%{query}%", f"%{query}%", limit)).fetchall()
         else:
-            rows = _get().execute(
+            rows = c.execute(
                 "SELECT * FROM notes ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     return [dict(r) for r in rows]
 
-
-# ---------- stats ----------
 
 def stats() -> dict:
     with _lock:

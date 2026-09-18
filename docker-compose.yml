@@ -1,0 +1,20 @@
+services:
+  agentuse:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      AGENTUSE_HOST: "0.0.0.0"
+      AGENTUSE_PORT: "8000"
+      AGENTUSE_TOKEN: "${AGENTUSE_TOKEN:-}"
+      XAI_API_KEY: "${XAI_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      GH_TOKEN: "${GH_TOKEN:-}"
+    volumes:
+      - agentuse-data:/app/data
+
+volumes:
+  agentuse-data:

@@ -12,10 +12,18 @@ EVENTS_LOG = DATA / "events.jsonl"
 for d in (DATA, WORKSPACE, SANDBOX):
     d.mkdir(parents=True, exist_ok=True)
 
+VERSION = "2.0.0"
+
+# Bind 0.0.0.0 so Docker/LAN work; lock down with AGENTUSE_TOKEN in production.
 HOST = os.environ.get("AGENTUSE_HOST", "0.0.0.0")
 PORT = int(os.environ.get("AGENTUSE_PORT", "8000"))
+TOKEN = os.environ.get("AGENTUSE_TOKEN", "")
 
 # --- Neural core providers (all optional; heuristic core used if none) ---
+XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
+XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4")
+XAI_BASE_URL = os.environ.get("XAI_BASE_URL", "https://api.x.ai/v1")
+
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
@@ -39,7 +47,7 @@ GITHUB_TOKEN = os.environ.get("GH_TOKEN", "") or os.environ.get("GITHUB_TOKEN", 
 
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0 Safari/537.36 AgentUseBot/1.0"
+    "(KHTML, like Gecko) Chrome/126.0 Safari/537.36 AgentUseBot/2.0"
 )
 
 HTTP_TIMEOUT = float(os.environ.get("AGENTUSE_HTTP_TIMEOUT", "12"))

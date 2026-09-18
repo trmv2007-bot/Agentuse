@@ -5,7 +5,7 @@ import time
 import traceback
 from typing import Any
 
-from .. import store
+from .. import config, store
 from ..bus import bus
 from ..tools import registry
 
@@ -18,7 +18,6 @@ class Agent:
         self.actions_done = 0
         self.busy = False
 
-    # ---- identity helpers ----
     def _step(self) -> int:
         self.step_no += 1
         return self.step_no
@@ -26,7 +25,6 @@ class Agent:
     def cancelled(self) -> bool:
         return store.mission_status(self.mid) in ("cancel-requested", "cancelled")
 
-    # ---- emissions ----
     async def think(self, text: str) -> None:
         await bus.emit_async("thought", {"text": text}, mission=self.mid, step=self._step())
 
@@ -53,9 +51,18 @@ class Agent:
                                           "title": title or path}, mission=self.mid)
         return res
 
-    # ---- the core move: run a tool, fully visible ----
     async def act(self, tool: str, label: str = "", timeout: float = 60.0,
                   **args) -> Any:
+        if self.cancelled():
+            await bus.emit_async("action.end", {
+                "tool": tool, "label": label or tool, "status": "cancelled",
+                "ms": 0, "summary": "aborted by operator"}, mission=self.mid)
+            return {"ok": False, "error": "cancelled"}
+        if self.actions_done >= config.MAX_STEPS:
+            await bus.emit_async("action.end", {
+                "tool": tool, "label": label or tool, "status": "error",
+                "ms": 0, "summary": f"MAX_STEPS ({config.MAX_STEPS}) reached"}, mission=self.mid)
+            return {"ok": False, "error": "max steps reached"}
         if tool not in registry.TOOLS:
             await bus.emit_async("action.end", {
                 "tool": tool, "label": label or tool, "status": "error",
@@ -117,6 +124,8 @@ def _summarize_result(tool: str, result: Any) -> str:
                 return f"fetch failed: {result.get('error', 'unknown')[:80]}"
             if tool in ("github_search",):
                 return f"{len(result.get('repos', []))} repos"
+            if tool == "github_issues":
+                return f"{len(result.get('issues', []))} open issues"
             if tool == "github_repo":
                 if result.get("ok"):
                     return f"★{result.get('stars')} · {result.get('lang')} · pushed {result.get('updated')}"

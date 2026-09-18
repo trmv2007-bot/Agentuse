@@ -95,7 +95,7 @@ async def strategy_help(agent: Agent, goal: str) -> str:
         "• URL digest — fetch any page, extract readable content + key bullets\n"
         "• CodeBox — execute Python / JavaScript in a sandboxed box\n"
         "• Diagnostics — probe every network route live\n\n"
-        "Attach a NEURAL CORE (OpenAI / Anthropic / Gemini / OpenRouter / any "
+        "Attach a NEURAL CORE (xAI Grok / OpenAI / Anthropic / Gemini / OpenRouter / any "
         "OpenAI-compatible endpoint via env vars) and I upgrade to full ReAct "
         "reasoning over these same tools. Everything I do streams to this grid."))
     await agent.say("All systems online. Issue a directive and I will execute it on the grid.")

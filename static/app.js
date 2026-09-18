@@ -30,6 +30,21 @@ const state = {
 };
 
 /* ─────────────── utilities ─────────────── */
+/* ─────────────── auth + fetch ─────────────── */
+const TOKEN = localStorage.getItem('au-token') || '';
+function apiHeaders(extra) {
+  const h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+  if (TOKEN) h['x-agentuse-token'] = TOKEN;
+  return h;
+}
+function apiFetch(url, opts) {
+  opts = opts || {};
+  opts.headers = apiHeaders(opts.headers);
+  const sep = url.includes('?') ? '&' : '?';
+  if (TOKEN && url.startsWith('/')) url = url + sep + 'token=' + encodeURIComponent(TOKEN);
+  return fetch(url, opts);
+}
+
 const fmtTime = (ts) => {
   const d = ts ? new Date(ts * 1000) : new Date();
   return d.toTimeString().slice(0, 8);
@@ -315,7 +330,7 @@ function renderMissions() {
     meta.appendChild(el('span', null, m.actions ? m.actions + ' acts' : ''));
     if (m.status === 'running') {
       const btn = el('button', 'm-cancel', 'ABORT');
-      btn.onclick = async () => { await fetch(`/api/missions/${m.id}/cancel`, { method: 'POST' }); };
+      btn.onclick = async () => { await apiFetch(`/api/missions/${m.id}/cancel`, { method: 'POST' }); };
       meta.appendChild(btn);
     } else {
       meta.appendChild(el('span', null, m.status));
@@ -460,7 +475,7 @@ function renderArtifacts() {
 }
 async function openArtifact(path) {
   try {
-    const r = await fetch('/api/artifact?path=' + encodeURIComponent(path));
+    const r = await apiFetch('/api/artifact?path=' + encodeURIComponent(path));
     const data = await r.json();
     openModal(path, renderMarkdown(data.content || '(empty)'));
   } catch { openModal(path, 'failed to load'); }
@@ -544,10 +559,22 @@ $('mode-ultron').onclick = () => setMode('ultron');
 async function launchFromInput() {
   const goal = $('cmd').value.trim();
   if (!goal) return;
+  const running = [...state.missions.values()].find(m => m.status === 'running');
+  if (running && (goal.startsWith('/') || goal.toLowerCase().startsWith('steer '))) {
+    const text = goal.replace(/^\/steer\s+/i, '').replace(/^steer\s+/i, '').replace(/^\//, '');
+    $('cmd').value = '';
+    try {
+      await apiFetch(`/api/missions/${running.id}/steer`, {
+        method: 'POST', body: JSON.stringify({ text: text || goal }),
+      });
+      addSys('steer queued → ' + running.id, 'info');
+    } catch (e) { addSys('steer failed: ' + e.message, 'error'); }
+    return;
+  }
   $('cmd').value = '';
   try {
-    const r = await fetch('/api/missions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const r = await apiFetch('/api/missions', {
+      method: 'POST',
       body: JSON.stringify({ goal, mode: state.mode }),
     });
     const data = await r.json();
@@ -560,7 +587,7 @@ $('exec').onclick = launchFromInput;
 $('cmd').addEventListener('keydown', (e) => { if (e.key === 'Enter') launchFromInput(); });
 $('reprobe').onclick = async () => {
   addSys('manual net-probe requested', 'info');
-  await fetch('/api/netmap/probe', { method: 'POST' });
+  await apiFetch('/api/netmap/probe', { method: 'POST' });
 };
 
 /* ─────────────── event router ─────────────── */
@@ -633,6 +660,12 @@ function handleEvent(ev) {
     case 'speech':
       speak(p.text);
       break;
+    case 'steer':
+    case 'steer_applied':
+      addSys('STEER · ' + (p.text || ''), 'info');
+      break;
+    case 'llm.delta':
+      break;
     case 'error':
       addSys(p.text, 'error');
       addLog(p.text, 'error');
@@ -644,7 +677,8 @@ function handleEvent(ev) {
 let wsBackoff = 1000;
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const q = TOKEN ? ('?token=' + encodeURIComponent(TOKEN)) : '';
+  const ws = new WebSocket(`${proto}://${location.host}/ws${q}`);
   state.ws = ws;
   ws.onopen = () => { /* hello arrives next */ };
   ws.onmessage = (e) => {
@@ -674,7 +708,7 @@ function connect() {
 /* ─────────────── initial state ─────────────── */
 async function loadState() {
   try {
-    const r = await fetch('/api/state');
+    const r = await apiFetch('/api/state');
     const s = await r.json();
     state.neural = s.core.kind === 'neural';
     state.core = s.core.provider;

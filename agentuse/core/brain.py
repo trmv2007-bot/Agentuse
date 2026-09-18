@@ -8,8 +8,9 @@ import asyncio
 import json
 import time
 import uuid
+from collections import deque
 
-from .. import store
+from .. import config, store
 from ..bus import bus
 from ..tools import registry
 from . import llm, planner
@@ -27,6 +28,7 @@ Operating rules:
 - When you have enough evidence, produce a final answer with concrete facts
   (numbers, versions, stars, dates). If routes are blocked, say exactly which.
 - Missions end with either a final answer or a clear statement of blockers.
+- Honor mid-run STEER messages from the operator immediately.
 """
 
 
@@ -37,8 +39,8 @@ class MissionRunner:
         self.mode = mode if mode in ("jarvis", "ultron") else "jarvis"
         self.agent = Agent(self.mid, self.mode)
         self.task: asyncio.Task | None = None
+        self.steers: deque[str] = deque()
 
-    # ---- lifecycle ----
     def start(self) -> str:
         use_neural = llm.available()
         core = "neural" if use_neural else "heuristic"
@@ -48,6 +50,19 @@ class MissionRunner:
         self.task = asyncio.get_event_loop().create_task(self._run(use_neural))
         missions[self.mid] = self
         return self.mid
+
+    def push_steer(self, text: str) -> None:
+        self.steers.append(text.strip())
+        bus.emit("steer", {"text": text.strip()}, mission=self.mid)
+
+    async def drain_steers(self) -> list[str]:
+        out = []
+        while self.steers:
+            text = self.steers.popleft()
+            out.append(text)
+            await self.agent.think(f"STEER from operator: {text}")
+            await bus.emit_async("steer_applied", {"text": text}, mission=self.mid)
+        return out
 
     async def _run(self, use_neural: bool) -> None:
         t0 = time.perf_counter()
@@ -79,8 +94,13 @@ class MissionRunner:
         if status == "done":
             await self.agent.say(f"Mission complete. {summary[:160]}")
 
-    # ---- heuristic core ----
     async def _run_heuristic(self) -> str:
+        if self.agent.cancelled():
+            return "cancelled"
+        notes = store.recall(self.goal.split()[0] if self.goal.split() else "", limit=4)
+        if notes:
+            await self.agent.think(
+                f"Recalled {len(notes)} memory note(s) matching this directive.")
         intent = planner.classify(self.goal)
         await bus.emit_async("intent", {"intent": intent, "core": "heuristic"},
                              mission=self.mid)
@@ -95,12 +115,16 @@ class MissionRunner:
                                  mission=self.mid)
             raise
 
-    # ---- neural core (ReAct) ----
     async def _run_neural(self) -> str:
         provider = llm.detect()  # type: ignore[union-attr]
         schemas_oai = registry.openai_schemas()
         schemas_anthropic = registry.anthropic_schemas()
-        kind_schemas = schemas_anthropic if provider["kind"] == "anthropic" else schemas_oai
+        if provider["kind"] == "anthropic":
+            kind_schemas = schemas_anthropic
+        elif provider["kind"] == "gemini":
+            kind_schemas = schemas_anthropic  # name + input_schema → gemini_schemas()
+        else:
+            kind_schemas = schemas_oai
 
         await self.agent.plan([
             "Reason over directive (neural core)", "Execute tools as needed",
@@ -113,11 +137,25 @@ class MissionRunner:
                         f"MISSION: {self.goal}\nMODE: {self.mode} "
                         f"({'parallel actions allowed' if self.mode == 'ultron' else 'be careful and sequential'})"}]
         final_text = ""
-        for turn in range(1, config_max_turns() + 1):
+
+        async def on_token(piece: str):
+            # stream fragments as thoughts only in small batches via think is noisy;
+            # emit a lightweight token event instead.
+            await bus.emit_async("llm.delta", {"text": piece}, mission=self.mid)
+
+        for turn in range(1, config.MAX_LLM_TURNS + 1):
             if self.agent.cancelled():
                 return "cancelled"
-            resp = await llm.chat(provider, messages,
-                                  kind_schemas if provider["kind"] != "gemini" else kind_schemas)
+            if self.agent.actions_done >= config.MAX_STEPS:
+                await self.agent.think("Hit MAX_STEPS — delivering whatever evidence I have.")
+                break
+            steers = await self.drain_steers()
+            if steers:
+                messages.append({"role": "user", "content":
+                                 "OPERATOR STEER:\n" + "\n".join(steers)})
+            use_stream = provider["kind"] == "openai"
+            resp = await llm.chat(provider, messages, kind_schemas,
+                                  on_token=on_token if use_stream else None)
             if resp.get("text"):
                 await self.agent.think(resp["text"][:800])
                 final_text = resp["text"]
@@ -126,7 +164,6 @@ class MissionRunner:
                 if final_text:
                     await self.agent.card("answer", "Neural core conclusion", text=final_text)
                 return final_text[:400] or "complete"
-            # append assistant message with tool calls
             messages = _append_assistant(messages, provider, resp)
             for call in calls:
                 if self.agent.cancelled():
@@ -135,11 +172,6 @@ class MissionRunner:
                 result = await self.agent.act(name, label=name, **args)
                 messages = _append_tool_result(messages, provider, call, result)
         return final_text[:400] or "max turns reached"
-
-
-def config_max_turns() -> int:
-    from .. import config
-    return config.MAX_LLM_TURNS
 
 
 def _append_assistant(messages: list, provider: dict, resp: dict) -> list:
@@ -159,15 +191,15 @@ def _append_assistant(messages: list, provider: dict, resp: dict) -> list:
                                      "function": {"name": c["name"],
                                                   "arguments": json.dumps(c["args"])}}
                                     for c in resp["tool_calls"]]}]
-    else:  # gemini — fold tool calls into text for the next turn
+    else:  # gemini — keep structured tool_calls so _chat_gemini can emit functionCall parts
         messages = messages + [{"role": "assistant",
-                                "content": resp.get("text") or "(calling tools)"}]
+                                "content": resp.get("text") or "(calling tools)",
+                                "tool_calls": resp.get("tool_calls") or []}]
     return messages
 
 
 def _append_tool_result(messages: list, provider: dict, call: dict, result) -> list:
-    import json as _json
-    payload = _json.dumps(result, ensure_ascii=False, default=str)[:12000]
+    payload = json.dumps(result, ensure_ascii=False, default=str)[:12000]
     if provider["kind"] == "anthropic":
         messages = messages + [{"role": "user", "content": [
             {"type": "tool_result", "tool_use_id": call["id"],
@@ -175,16 +207,12 @@ def _append_tool_result(messages: list, provider: dict, call: dict, result) -> l
     elif provider["kind"] == "openai":
         messages = messages + [{"role": "tool", "tool_call_id": call["id"],
                                 "content": payload}]
-    else:  # gemini
-        messages = messages + [{"role": "user", "content":
-                                f"TOOL RESULT {call['name']}: {payload[:8000]}"}]
+    else:  # gemini functionResponse
+        messages = messages + [{"role": "tool", "name": call["name"],
+                                "content": payload[:8000]}]
     return messages
 
 
-import json  # noqa: E402  (used in _append_assistant)
-
-
-# live runners registry
 missions: dict[str, MissionRunner] = {}
 
 
@@ -200,3 +228,11 @@ def cancel(mid: str) -> bool:
             runner.task.cancel()
         return True
     return False
+
+
+def steer(mid: str, text: str) -> bool:
+    runner = missions.get(mid)
+    if not runner or not runner.task or runner.task.done():
+        return False
+    runner.push_steer(text)
+    return True

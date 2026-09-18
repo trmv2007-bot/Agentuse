@@ -104,22 +104,33 @@ and prints what it tried when nothing works.
 ## Neural core (optional upgrade)
 
 Drop any **one** of these env vars and the heuristic core is replaced by a full
-LLM **ReAct loop** (reason → call tools → observe → repeat) over the same 13 tools:
+LLM **ReAct loop** (reason → call tools → observe → repeat) over 14 tools.
+OpenAI-compatible providers (including **xAI Grok**) stream tokens onto the grid.
 
 ```bash
+export XAI_API_KEY=xai-...              # Grok — first-class, streams thoughts
+export XAI_MODEL=grok-4                 # default
+
 export OPENAI_API_KEY=sk-...            # or any OpenAI-compatible server:
 export OPENAI_BASE_URL=http://localhost:11434/v1   # Ollama, LM Studio, Groq…
 export OPENAI_MODEL=llama3.1
 
 export ANTHROPIC_API_KEY=sk-ant-...
-export GEMINI_API_KEY=...
+export GEMINI_API_KEY=...               # native functionResponse history
 export OPENROUTER_API_KEY=sk-or-...
 
 # generic OpenAI-compatible override:
 export AGENTUSE_LLM_BASE_URL=... AGENTUSE_LLM_API_KEY=... AGENTUSE_LLM_MODEL=...
+
+# optional lock: AGENTUSE_TOKEN on every REST/WS call (header x-agentuse-token)
+export AGENTUSE_TOKEN=...
 ```
 
 The top-bar chip shows which core is live: `◈ CORE · HEURISTIC` or `◈ CORE · NEURAL`.
+While a mission is running, type `/steer <instruction>` in the command bar to
+inject a mid-run operator instruction.
+
+**Docker:** `docker compose up --build` → SpaceGrid on port 8000, data in a volume.
 
 ## Internet control, honestly
 
@@ -135,13 +146,13 @@ Search is a **provider fallback chain**: DDG-lite → Bing → Wikipedia → HN 
 StackOverflow → arXiv → GitHub, merging + de-duplicating results, and every attempt
 is streamed to the grid.
 
-## The 13 tools
+## The 14 tools
 
 | Tool | Purpose |
 |---|---|
 | `web_search` | multi-provider web sweep |
 | `fetch_page` | fetch + readability extraction + bullets |
-| `github_search` / `github_repo` | repo sweep / deep intel incl. README |
+| `github_search` / `github_repo` / `github_issues` | repo sweep / deep intel / open issues |
 | `pypi_info` / `npm_info` | registry intel: versions, deps, cadence |
 | `run_code` | sandboxed Python/JavaScript (CPU/RAM/time-limited subprocess) |
 | `write_file` / `read_file` / `list_files` | workspace territory (`data/workspace/`) |
@@ -181,12 +192,14 @@ no audio leaves your machine.
 ```
 POST /api/missions            {goal, mode: jarvis|ultron} → {id}
 POST /api/missions/{id}/cancel
-GET  /api/state               core, netmap, missions, artifacts, stats
+POST /api/missions/{id}/steer  {text}   mid-run operator instruction
+GET  /api/state               core, netmap, missions, artifacts, stats, version
 GET  /api/events?after=N      persisted event replay
 POST /api/netmap/probe        re-probe all routes
 POST /api/exec                {code, lang} manual CodeBox run (also streamed)
-GET  /api/artifact?path=      read a workspace artifact
+GET  /api/artifact?path=      read a workspace artifact (path-jailed)
 WS   /ws                      live event stream (send {after: seq} after hello)
+                              ?token= if AGENTUSE_TOKEN is set
 ```
 
 ## Security notes

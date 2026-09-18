@@ -2,7 +2,6 @@
 from typing import Callable
 from urllib.parse import quote_plus
 
-from .. import config
 from . import net
 
 
@@ -30,7 +29,6 @@ async def search_duckduckgo(q: str, limit: int = 8) -> list[dict]:
             idx = len([o for o in out if o["snippet"]])
             if idx < len(out):
                 out[idx]["snippet"] = _clean(snip.get_text())
-    # html.duckduckgo.com layout
     if not out:
         for res in soup.select("div.result")[:limit]:
             a = res.select_one("a.result__a")
@@ -162,13 +160,32 @@ PROVIDERS: list[tuple[str, str, Callable]] = [
     ("github", "GitHub", search_github),
 ]
 
+# search provider id → NetProbe route id
+ROUTE_FOR: dict[str, str] = {
+    "duckduckgo": "ddg-lite",
+    "bing": "bing",
+    "wikipedia": "wikipedia",
+    "hackernews": "hackernews",
+    "stackexchange": "stackexchange",
+    "arxiv": "arxiv",
+    "github": "github-api",
+}
+
 
 async def web_search(q: str, limit: int = 8, providers: list[str] | None = None,
                      on_attempt: Callable[[str, str], None] | None = None) -> dict:
-    """Run through providers until enough results merge. Reports every attempt."""
+    """Run through live providers until enough results merge. Reports every attempt."""
     results, attempts = [], []
+    live = net.live_route_ids()
+    probed = any(r.status != "unknown" for r in net.ROUTES)
     for pid, label, fn in PROVIDERS:
         if providers and pid not in providers:
+            continue
+        route_id = ROUTE_FOR.get(pid)
+        if probed and live and route_id and route_id not in live:
+            attempts.append({"provider": label, "count": 0, "skipped": "blocked"})
+            if on_attempt:
+                on_attempt(pid, f"{label} skipped (route blocked)")
             continue
         if on_attempt:
             on_attempt(pid, label)
